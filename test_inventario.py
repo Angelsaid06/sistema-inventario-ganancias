@@ -1,6 +1,7 @@
 import sqlite3
 from database import crear_tablas
 from inventario import calcular_ganancia, registrar_compra, registrar_venta
+from prediccion import promedio_movil, dias_restantes, sugerir_reabasto
 
 
 def test_ganancia_refrescos():
@@ -63,3 +64,16 @@ def test_venta_sin_suficientes_piezas(tmp_path, monkeypatch):
     registrar_compra(1, 5, 50)
     registrar_venta(1, 10)
     assert leer_existencias() == 5
+
+def test_promedio_movil():
+    assert promedio_movil([2, 4, 6], 7) == 4
+
+
+def test_dias_restantes():
+    assert dias_restantes(10, 2) == 5
+    assert dias_restantes(10, 0) is None
+
+
+def test_sugerir_reabasto():
+    assert sugerir_reabasto(5, 2, 7) == 9
+    assert sugerir_reabasto(50, 2, 7) == 0

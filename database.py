@@ -1,8 +1,8 @@
 import sqlite3
 
 
-def crear_tablas():
-    conexion = sqlite3.connect("inventario.db")
+def crear_tablas(nombre_db="inventario.db"):
+    conexion = sqlite3.connect(nombre_db)
     cursor = conexion.cursor()
 
     cursor.execute("""

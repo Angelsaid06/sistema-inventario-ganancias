@@ -1,8 +1,9 @@
+import os
 import sqlite3
 import streamlit as st
 import pandas as pd
 from inventario import registrar_compra, registrar_venta, calcular_ganancia, registrar_gasto
-
+from prediccion import ventas_por_dia, promedio_movil, dias_restantes, sugerir_reabasto
 
 def obtener_productos():
     conexion = sqlite3.connect("inventario.db")
@@ -225,6 +226,47 @@ def pagina_mes():
         )
         csv = datos.to_csv(index=False)
         st.download_button("Descargar ventas en CSV", csv, "ventas.csv", "text/csv")
+def pagina_prediccion():
+    st.header("Prediccion de reabastecimiento")
+    fuente = st.radio("Datos", ["Mis datos", "Datos de demo (inventados)"])
+
+    if fuente == "Mis datos":
+        nombre_db = "inventario.db"
+    else:
+        nombre_db = "demo.db"
+
+    if not os.path.exists(nombre_db):
+        st.write("No se encontro la base. Para la demo corre: py generar_demo.py")
+        return
+
+    conexion = sqlite3.connect(nombre_db)
+    cursor = conexion.cursor()
+    cursor.execute("SELECT id, nombre, existencias FROM productos")
+    productos = cursor.fetchall()
+    conexion.close()
+
+    tabla = []
+    for producto in productos:
+        ventas = ventas_por_dia(nombre_db, producto[0])
+        promedio = promedio_movil(ventas, 7)
+        dias = dias_restantes(producto[2], promedio)
+        sugerido = sugerir_reabasto(producto[2], promedio, 7)
+
+        if dias is None:
+            texto_dias = "sin ventas recientes"
+        else:
+            texto_dias = str(round(dias, 1))
+
+        tabla.append({
+            "Producto": producto[1],
+            "Existencias": producto[2],
+            "Promedio diario (7 dias)": round(promedio, 1),
+            "Dias que le quedan": texto_dias,
+            "Reponer (para 7 dias)": sugerido,
+        })
+
+    st.table(tabla)
+    st.caption("Estimacion basada en el promedio de los ultimos 7 dias; no es una garantia.")
 st.title("Inventario y ganancias")
 
 pagina = st.sidebar.radio(
