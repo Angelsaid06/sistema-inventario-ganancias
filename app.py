@@ -271,7 +271,7 @@ st.title("Inventario y ganancias")
 
 pagina = st.sidebar.radio(
     "Menu",
-    ["Productos", "Registrar venta", "Registrar compra", "Gastos", "Reporte de ganancias", "Ventas por dia", "Reporte por mes"]
+    ["Productos", "Registrar venta", "Registrar compra", "Gastos", "Reporte de ganancias", "Ventas por dia", "Reporte por mes", "Prediccion"]
 )
 
 if pagina == "Productos":
@@ -286,5 +286,7 @@ elif pagina == "Reporte de ganancias":
     pagina_reporte()
 elif pagina == "Ventas por dia":
     pagina_ventas_dia()
-else:
+elif pagina == "Reporte por mes":
     pagina_mes()
+else:
+    pagina_prediccion()
