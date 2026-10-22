@@ -4,6 +4,7 @@ import streamlit as st
 import pandas as pd
 from inventario import registrar_compra, registrar_venta, calcular_ganancia, registrar_gasto
 from prediccion import ventas_por_dia, promedio_movil, dias_restantes, sugerir_reabasto, comparar_modelos
+from asistente import preguntar, crear_tabla_precios, registrar_precio, precios_proveedor
 
 def obtener_productos():
     conexion = sqlite3.connect("inventario.db")
@@ -294,12 +295,77 @@ def pagina_prediccion():
 
 
 
+def pagina_precios():
+    st.header("Precios de proveedores")
+    crear_tabla_precios("inventario.db")
+    productos = obtener_productos()
+    nombres = []
+    for fila in productos:
+        nombres.append(fila[1])
 
+    elegido = st.selectbox("Producto", nombres)
+    producto_id = productos[nombres.index(elegido)][0]
+    proveedor = st.text_input("Proveedor o tienda")
+    precio = st.number_input("Precio por pieza", min_value=0.0, step=0.5)
+
+    if st.button("Guardar precio"):
+        if proveedor == "" or precio <= 0:
+            st.error("Escribe el proveedor y un precio mayor a 0")
+        else:
+            registrar_precio("inventario.db", producto_id, proveedor, precio)
+            st.success("Precio guardado")
+
+    lista = precios_proveedor("inventario.db")
+    if len(lista) > 0:
+        st.table(lista)
+
+
+def pagina_asistente():
+    st.header("Asistente de compras")
+
+    if os.environ.get("ANTHROPIC_API_KEY") is None:
+        st.error("Falta la clave de la API (variable de entorno ANTHROPIC_API_KEY).")
+        return
+
+    fuente = st.radio("Datos", ["Mis datos", "Datos de demo (inventados)"])
+    if fuente == "Mis datos":
+        nombre_db = "inventario.db"
+    else:
+        nombre_db = "demo.db"
+
+    if not os.path.exists(nombre_db):
+        st.write("No se encontro la base. Para la demo corre: py generar_demo.py")
+        return
+
+    if "chat" not in st.session_state:
+        st.session_state.chat = []
+        st.session_state.mensajes_api = []
+
+    if st.button("Nueva conversacion"):
+        st.session_state.chat = []
+        st.session_state.mensajes_api = []
+        st.rerun()
+
+    for mensaje in st.session_state.chat:
+        with st.chat_message(mensaje["rol"]):
+            st.write(mensaje["texto"])
+
+    pregunta = st.chat_input("Ejemplo: que compro este fin de semana con 500 pesos?")
+    if pregunta:
+        st.session_state.chat.append({"rol": "user", "texto": pregunta})
+        try:
+            with st.spinner("Pensando..."):
+                texto, mensajes = preguntar(pregunta, st.session_state.mensajes_api, nombre_db)
+            st.session_state.mensajes_api = mensajes
+            st.session_state.chat.append({"rol": "assistant", "texto": texto})
+        except Exception as error:
+            st.session_state.chat.append({"rol": "assistant", "texto": "Error: " + str(error)})
+        st.rerun()
 st.title("Inventario y ganancias")
 
 pagina = st.sidebar.radio(
     "Menu",
-    ["Productos", "Registrar venta", "Registrar compra", "Gastos", "Reporte de ganancias", "Ventas por dia", "Reporte por mes", "Prediccion"]
+    ["Productos", "Registrar venta", "Registrar compra", "Gastos", "Reporte de ganancias", "Ventas por dia", "Reporte por mes", "Prediccion", "Precios de proveedores", "Asistente"]
 )
 
 if pagina == "Productos":
@@ -316,5 +382,9 @@ elif pagina == "Ventas por dia":
     pagina_ventas_dia()
 elif pagina == "Reporte por mes":
     pagina_mes()
-else:
+elif pagina == "Prediccion":
     pagina_prediccion()
+elif pagina == "Precios de proveedores":
+    pagina_precios()
+else:
+    pagina_asistente()

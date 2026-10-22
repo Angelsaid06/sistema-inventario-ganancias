@@ -3,6 +3,7 @@ from database import crear_tablas
 from inventario import calcular_ganancia, registrar_compra, registrar_venta
 from prediccion import promedio_movil, dias_restantes, sugerir_reabasto
 from prediccion import comparar_modelos
+from asistente import ver_inventario, ejecutar_herramienta
 
 
 
@@ -100,3 +101,15 @@ def test_venta_con_cantidad_cero(tmp_path, monkeypatch):
     registrar_compra(1, 5, 50)
     registrar_venta(1, 0)
     assert leer_existencias() == 5
+
+def test_ver_inventario_calcula_costo_promedio(tmp_path, monkeypatch):
+    preparar_base(tmp_path, monkeypatch)
+    registrar_compra(1, 10, 100)
+    inventario = ver_inventario("inventario.db")
+    assert inventario[0]["existencias"] == 10
+    assert inventario[0]["costo_promedio"] == 10
+
+
+def test_herramienta_desconocida():
+    resultado = ejecutar_herramienta("no_existe", {}, "inventario.db")
+    assert "error" in resultado
