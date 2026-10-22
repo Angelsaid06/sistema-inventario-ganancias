@@ -122,3 +122,7 @@ py -m pytest
 
 \- Interfaz web con Streamlit
 
+## Capturas
+
+![Reporte de ganancias](imagenes/reporte.png)
+

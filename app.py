@@ -141,3 +141,7 @@ elif pagina == "Registrar compra":
     pagina_compra()
 else:
     pagina_reporte()
+
+## Capturas
+
+![Reporte de ganancias](imagenes/reporte.png)
