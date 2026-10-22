@@ -3,7 +3,7 @@ import sqlite3
 import streamlit as st
 import pandas as pd
 from inventario import registrar_compra, registrar_venta, calcular_ganancia, registrar_gasto
-from prediccion import ventas_por_dia, promedio_movil, dias_restantes, sugerir_reabasto
+from prediccion import ventas_por_dia, promedio_movil, dias_restantes, sugerir_reabasto, comparar_modelos
 
 def obtener_productos():
     conexion = sqlite3.connect("inventario.db")
@@ -267,6 +267,34 @@ def pagina_prediccion():
 
     st.table(tabla)
     st.caption("Estimacion basada en el promedio de los ultimos 7 dias; no es una garantia.")
+
+
+
+
+    st.subheader("Que tan bien predice cada metodo")
+    comparacion = []
+    for producto in productos:
+        ventas = ventas_por_dia(nombre_db, producto[0])
+        resultado = comparar_modelos(ventas)
+        if resultado is None:
+            comparacion.append({
+                "Producto": producto[1],
+                "Error promedio simple": "faltan datos",
+                "Error modelo ML": "faltan datos",
+            })
+        else:
+            comparacion.append({
+                "Producto": producto[1],
+                "Error promedio simple": round(resultado[0], 2),
+                "Error modelo ML": round(resultado[1], 2),
+            })
+    st.table(comparacion)
+    st.caption("Error = diferencia promedio entre las piezas reales y las predichas por dia, medida en los ultimos dias que el modelo no vio al entrenar. Menor es mejor.")
+
+
+
+
+
 st.title("Inventario y ganancias")
 
 pagina = st.sidebar.radio(
