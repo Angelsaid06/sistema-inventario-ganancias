@@ -1,5 +1,6 @@
 import sqlite3
 import streamlit as st
+import pandas as pd
 from inventario import registrar_compra, registrar_venta, calcular_ganancia
 
 
@@ -133,12 +134,42 @@ def pagina_reporte():
     st.write("Costos totales:", round(total_costos, 2))
     st.subheader("Ganancia total: " + str(round(total_ingresos - total_costos, 2)))
 
+def pagina_ventas_dia():
+    st.header("Ventas por dia")
+    conexion = sqlite3.connect("inventario.db")
+    cursor = conexion.cursor()
 
+    cursor.execute(
+        "SELECT fecha, SUM(cantidad), SUM(cantidad * precio_unitario) "
+        "FROM ventas GROUP BY fecha ORDER BY fecha"
+    )
+    por_dia = cursor.fetchall()
+
+    cursor.execute(
+        "SELECT productos.nombre, SUM(ventas.cantidad) "
+        "FROM ventas JOIN productos ON ventas.producto_id = productos.id "
+        "GROUP BY productos.nombre ORDER BY SUM(ventas.cantidad) DESC"
+    )
+    mas_vendidos = cursor.fetchall()
+    conexion.close()
+
+    if len(por_dia) == 0:
+        st.write("Todavia no hay ventas registradas")
+    else:
+        tabla = []
+        for fila in por_dia:
+            tabla.append({"Fecha": fila[0], "Piezas": fila[1], "Ingresos": fila[2]})
+        st.table(tabla)
+
+        st.subheader("Productos mas vendidos")
+        datos = pd.DataFrame(mas_vendidos, columns=["Producto", "Vendidas"])
+        datos = datos.set_index("Producto")
+        st.bar_chart(datos)
 st.title("Inventario y ganancias")
 
 pagina = st.sidebar.radio(
     "Menu",
-    ["Productos", "Registrar venta", "Registrar compra", "Reporte de ganancias"]
+    ["Productos", "Registrar venta", "Registrar compra", "Reporte de ganancias", "Ventas por dia"]
 )
 
 if pagina == "Productos":
@@ -147,5 +178,9 @@ elif pagina == "Registrar venta":
     pagina_venta()
 elif pagina == "Registrar compra":
     pagina_compra()
-else:
+elif pagina == "Reporte de ganancias":
     pagina_reporte()
+elif pagina == "Reporte de ganancias":
+    pagina_reporte()
+else:
+    pagina_ventas_dia()
