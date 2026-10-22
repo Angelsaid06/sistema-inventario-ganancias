@@ -193,11 +193,43 @@ def pagina_gastos():
         for fila in filas:
             tabla.append({"Fecha": fila[0], "Descripcion": fila[1], "Monto": fila[2]})
         st.table(tabla)
+def pagina_mes():
+    st.header("Reporte por mes")
+    conexion = sqlite3.connect("inventario.db")
+    cursor = conexion.cursor()
+
+    cursor.execute(
+        "SELECT substr(fecha, 1, 7), SUM(cantidad), SUM(cantidad * precio_unitario) "
+        "FROM ventas GROUP BY substr(fecha, 1, 7) ORDER BY 1"
+    )
+    por_mes = cursor.fetchall()
+
+    cursor.execute(
+        "SELECT ventas.fecha, productos.nombre, ventas.cantidad, ventas.precio_unitario "
+        "FROM ventas JOIN productos ON ventas.producto_id = productos.id "
+        "ORDER BY ventas.fecha"
+    )
+    todas = cursor.fetchall()
+    conexion.close()
+
+    if len(por_mes) == 0:
+        st.write("Todavia no hay ventas registradas")
+    else:
+        tabla = []
+        for fila in por_mes:
+            tabla.append({"Mes": fila[0], "Piezas": fila[1], "Ingresos": fila[2]})
+        st.table(tabla)
+
+        datos = pd.DataFrame(
+            todas, columns=["Fecha", "Producto", "Cantidad", "Precio unitario"]
+        )
+        csv = datos.to_csv(index=False)
+        st.download_button("Descargar ventas en CSV", csv, "ventas.csv", "text/csv")
 st.title("Inventario y ganancias")
 
 pagina = st.sidebar.radio(
     "Menu",
-    ["Productos", "Registrar venta", "Registrar compra", "Gastos", "Reporte de ganancias", "Ventas por dia"]
+    ["Productos", "Registrar venta", "Registrar compra", "Gastos", "Reporte de ganancias", "Ventas por dia", "Reporte por mes"]
 )
 
 if pagina == "Productos":
@@ -210,5 +242,7 @@ elif pagina == "Gastos":
     pagina_gastos()
 elif pagina == "Reporte de ganancias":
     pagina_reporte()
-else:
+elif pagina == "Ventas por dia":
     pagina_ventas_dia()
+else:
+    pagina_mes()

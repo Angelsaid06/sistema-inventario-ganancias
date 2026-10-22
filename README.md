@@ -13,7 +13,7 @@ Nació de una necesidad real: vendo botanas en mi universidad y quería saber cu
 \## Funciones
 
 
-
+- Reporte de ventas por mes y exportación a CSV
 - Agregar y consultar productos
 - Registrar compras (suman existencias)
 - Registrar ventas (restan existencias y avisan si no alcanza)
@@ -114,7 +114,6 @@ py -m pytest
 
 - La ganancia usa costo promedio por pieza (no distingue lotes con distinto costo)
 - Falta validar datos inválidos en el modo consola
-- Todavía no hay reporte por mes ni exportar a Excel
 - Pendiente publicar la app en línea
 
 ## Capturas
