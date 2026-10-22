@@ -2,7 +2,7 @@ import os
 import sqlite3
 import streamlit as st
 import pandas as pd
-from inventario import registrar_compra, registrar_venta, calcular_ganancia, registrar_gasto
+from inventario import registrar_compra, registrar_venta, registrar_gasto, listar_productos, resumen_ganancias
 from prediccion import ventas_por_dia, promedio_movil, dias_restantes, sugerir_reabasto, comparar_modelos
 from asistente import preguntar, crear_tabla_precios, registrar_precio, precios_proveedor, evaluar_recomendaciones, resumen_evaluacion
 from database import crear_tablas
@@ -11,18 +11,10 @@ if not os.path.exists("inventario.db"):
     crear_tablas()
     import cargar_datos
 
-def obtener_productos():
-    conexion = sqlite3.connect("inventario.db")
-    cursor = conexion.cursor()
-    cursor.execute("SELECT id, nombre, precio_venta, existencias FROM productos")
-    filas = cursor.fetchall()
-    conexion.close()
-    return filas
-
 
 def pagina_productos():
     st.header("Productos")
-    productos = obtener_productos()
+    productos = listar_productos()
 
     # Alertas: productos con 5 piezas o menos
     for fila in productos:
@@ -39,7 +31,7 @@ def pagina_productos():
 
 def pagina_venta():
     st.header("Registrar venta")
-    productos = obtener_productos()
+    productos = listar_productos()
     nombres = []
     for fila in productos:
         nombres.append(fila[1])
@@ -62,7 +54,7 @@ def pagina_venta():
 
 def pagina_compra():
     st.header("Registrar compra")
-    productos = obtener_productos()
+    productos = listar_productos()
     nombres = []
     for fila in productos:
         nombres.append(fila[1])
@@ -81,71 +73,27 @@ def pagina_compra():
 
 def pagina_reporte():
     st.header("Reporte de ganancias")
-    conexion = sqlite3.connect("inventario.db")
-    cursor = conexion.cursor()
-    cursor.execute("SELECT id, nombre FROM productos")
-    productos = cursor.fetchall()
+    resumen = resumen_ganancias()
 
-    tabla = []
-    total_ingresos = 0
-    total_costos = 0
-
-    for producto in productos:
-        cursor.execute(
-            "SELECT SUM(cantidad), SUM(costo_total) FROM compras WHERE producto_id = ?",
-            (producto[0],)
-        )
-        compras = cursor.fetchone()
-        cursor.execute(
-            "SELECT SUM(cantidad), SUM(cantidad * precio_unitario) FROM ventas WHERE producto_id = ?",
-            (producto[0],)
-        )
-        ventas = cursor.fetchone()
-
-        piezas_compradas = compras[0]
-        costo_compras = compras[1]
-        piezas_vendidas = ventas[0]
-        ingresos = ventas[1]
-
-        if piezas_compradas is None:
-            piezas_compradas = 0
-            costo_compras = 0
-        if piezas_vendidas is None:
-            piezas_vendidas = 0
-            ingresos = 0
-
-        costo_vendido, ganancia = calcular_ganancia(
-            piezas_compradas, costo_compras, piezas_vendidas, ingresos
-        )
-
-        if piezas_vendidas > 0:
+    if len(resumen["filas"]) > 0:
+        tabla = []
+        for fila in resumen["filas"]:
             tabla.append({
-                "Producto": producto[1],
-                "Vendidas": piezas_vendidas,
-                "Ingresos": round(ingresos, 2),
-                "Costo": round(costo_vendido, 2),
-                "Ganancia": round(ganancia, 2),
+                "Producto": fila["producto"],
+                "Vendidas": fila["vendidas"],
+                "Ingresos": fila["ingresos"],
+                "Costo": fila["costo"],
+                "Ganancia": fila["ganancia"],
             })
-
-        total_ingresos = total_ingresos + ingresos
-        total_costos = total_costos + costo_vendido
-    cursor.execute("SELECT SUM(monto) FROM gastos")
-    total_gastos = cursor.fetchone()[0]
-    if total_gastos is None:
-        total_gastos = 0
-    conexion.close()
-
-    if len(tabla) > 0:
         st.table(tabla)
     else:
         st.write("Todavia no hay ventas registradas")
 
-    st.write("Ingresos totales:", round(total_ingresos, 2))
-    st.write("Costos totales:", round(total_costos, 2))
-    st.write("Ganancia de ventas:", round(total_ingresos - total_costos, 2))
-    st.write("Gastos extra:", round(total_gastos, 2))
-    st.subheader("Ganancia neta: " + str(round(total_ingresos - total_costos - total_gastos, 2)))
-
+    st.write("Ingresos totales:", round(resumen["ingresos"], 2))
+    st.write("Costos totales:", round(resumen["costos"], 2))
+    st.write("Ganancia de ventas:", round(resumen["ganancia_ventas"], 2))
+    st.write("Gastos extra:", round(resumen["gastos"], 2))
+    st.subheader("Ganancia neta: " + str(round(resumen["ganancia_neta"], 2)))
 def pagina_ventas_dia():
     st.header("Ventas por dia")
     conexion = sqlite3.connect("inventario.db")
@@ -303,7 +251,7 @@ def pagina_prediccion():
 def pagina_precios():
     st.header("Precios de proveedores")
     crear_tabla_precios("inventario.db")
-    productos = obtener_productos()
+    productos = listar_productos()
     nombres = []
     for fila in productos:
         nombres.append(fila[1])

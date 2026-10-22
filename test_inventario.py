@@ -6,6 +6,7 @@ from prediccion import comparar_modelos
 from asistente import ver_inventario, ejecutar_herramienta
 from datetime import date, timedelta
 from asistente import guardar_recomendacion, evaluar_recomendaciones, resumen_evaluacion
+from inventario import resumen_ganancias
 
 
 
@@ -149,3 +150,12 @@ def test_evaluar_con_ventas_posteriores(tmp_path, monkeypatch):
 
 def test_resumen_sin_datos():
     assert resumen_evaluacion([]) is None
+
+def test_resumen_ganancias(tmp_path, monkeypatch):
+    preparar_base(tmp_path, monkeypatch)
+    registrar_compra(1, 24, 240)
+    registrar_venta(1, 10)
+    resumen = resumen_ganancias()
+    assert resumen["ingresos"] == 150
+    assert resumen["costos"] == 100
+    assert resumen["ganancia_neta"] == 50

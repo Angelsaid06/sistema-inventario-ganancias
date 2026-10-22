@@ -2,19 +2,6 @@ import sqlite3
 from datetime import date
 
 
-def ver_productos():
-    conexion = sqlite3.connect("inventario.db")
-    cursor = conexion.cursor()
-    cursor.execute("SELECT id, nombre, precio_venta, existencias FROM productos")
-    filas = cursor.fetchall()
-    conexion.close()
-
-    print("")
-    for fila in filas:
-        print(fila[0], "-", fila[1], "| precio:", fila[2], "| existencias:", fila[3])
-    print("")
-
-
 def agregar_producto(nombre, precio_venta):
     if nombre.strip() == "" or precio_venta <= 0:
         print("Nombre o precio invalido")
@@ -94,64 +81,8 @@ def calcular_ganancia(piezas_compradas, costo_compras, piezas_vendidas, ingresos
     costo_vendido = costo_promedio * piezas_vendidas
     ganancia = ingresos - costo_vendido
     return costo_vendido, ganancia
-def reporte_ganancias():
-    conexion = sqlite3.connect("inventario.db")
-    cursor = conexion.cursor()
 
-    cursor.execute("SELECT id, nombre FROM productos")
-    productos = cursor.fetchall()
 
-    total_ingresos = 0
-    total_costos = 0
-
-    print("")
-    for producto in productos:
-        producto_id = producto[0]
-        nombre = producto[1]
-
-        # Lo que compraste de este producto
-        cursor.execute(
-            "SELECT SUM(cantidad), SUM(costo_total) FROM compras WHERE producto_id = ?",
-            (producto_id,)
-        )
-        compras = cursor.fetchone()
-        piezas_compradas = compras[0]
-        costo_compras = compras[1]
-
-        # Lo que vendiste de este producto
-        cursor.execute(
-            "SELECT SUM(cantidad), SUM(cantidad * precio_unitario) FROM ventas WHERE producto_id = ?",
-            (producto_id,)
-        )
-        ventas = cursor.fetchone()
-        piezas_vendidas = ventas[0]
-        ingresos = ventas[1]
-
-        # Si no hay datos, SUM devuelve None; lo cambiamos por 0
-        if piezas_compradas is None:
-            piezas_compradas = 0
-            costo_compras = 0
-        if piezas_vendidas is None:
-            piezas_vendidas = 0
-            ingresos = 0
-
-        # Costo promedio por pieza
-            costo_vendido, ganancia = calcular_ganancia(piezas_compradas, costo_compras, piezas_vendidas, ingresos)
-
-        if piezas_vendidas > 0:
-            print(nombre, "| vendidas:", piezas_vendidas, "| ingresos:", ingresos,
-                  "| costo:", round(costo_vendido, 2), "| ganancia:", round(ganancia, 2))
-
-        total_ingresos = total_ingresos + ingresos
-        total_costos = total_costos + costo_vendido
-
-    print("")
-    print("TOTAL ingresos:", round(total_ingresos, 2))
-    print("TOTAL costos:", round(total_costos, 2))
-    print("GANANCIA TOTAL:", round(total_ingresos - total_costos, 2))
-    print("")
-
-    conexion.close()
 def registrar_gasto(descripcion, monto):
     if descripcion.strip() == "" or monto <= 0:
         print("Descripcion o monto invalido")
@@ -179,6 +110,104 @@ def pedir_decimal(texto):
             return float(input(texto))
         except ValueError:
             print("Escribe un numero valido")
+
+def listar_productos(nombre_db="inventario.db"):
+    conexion = sqlite3.connect(nombre_db)
+    cursor = conexion.cursor()
+    cursor.execute("SELECT id, nombre, precio_venta, existencias FROM productos")
+    filas = cursor.fetchall()
+    conexion.close()
+    return filas
+
+
+def ver_productos():
+    print("")
+    for fila in listar_productos():
+        print(fila[0], "-", fila[1], "| precio:", fila[2], "| existencias:", fila[3])
+    print("")
+
+
+def resumen_ganancias(nombre_db="inventario.db"):
+    conexion = sqlite3.connect(nombre_db)
+    cursor = conexion.cursor()
+
+    cursor.execute("SELECT id, nombre FROM productos")
+    productos = cursor.fetchall()
+
+    filas = []
+    total_ingresos = 0
+    total_costos = 0
+
+    for producto in productos:
+        cursor.execute(
+            "SELECT SUM(cantidad), SUM(costo_total) FROM compras WHERE producto_id = ?",
+            (producto[0],)
+        )
+        compras = cursor.fetchone()
+        cursor.execute(
+            "SELECT SUM(cantidad), SUM(cantidad * precio_unitario) FROM ventas WHERE producto_id = ?",
+            (producto[0],)
+        )
+        ventas = cursor.fetchone()
+
+        piezas_compradas = compras[0]
+        costo_compras = compras[1]
+        piezas_vendidas = ventas[0]
+        ingresos = ventas[1]
+
+        if piezas_compradas is None:
+            piezas_compradas = 0
+            costo_compras = 0
+        if piezas_vendidas is None:
+            piezas_vendidas = 0
+            ingresos = 0
+
+        costo_vendido, ganancia = calcular_ganancia(
+            piezas_compradas, costo_compras, piezas_vendidas, ingresos
+        )
+
+        if piezas_vendidas > 0:
+            filas.append({
+                "producto": producto[1],
+                "vendidas": piezas_vendidas,
+                "ingresos": round(ingresos, 2),
+                "costo": round(costo_vendido, 2),
+                "ganancia": round(ganancia, 2),
+            })
+
+        total_ingresos = total_ingresos + ingresos
+        total_costos = total_costos + costo_vendido
+
+    cursor.execute("SELECT SUM(monto) FROM gastos")
+    total_gastos = cursor.fetchone()[0]
+    if total_gastos is None:
+        total_gastos = 0
+
+    conexion.close()
+
+    return {
+        "filas": filas,
+        "ingresos": total_ingresos,
+        "costos": total_costos,
+        "gastos": total_gastos,
+        "ganancia_ventas": total_ingresos - total_costos,
+        "ganancia_neta": total_ingresos - total_costos - total_gastos,
+    }
+
+
+def reporte_ganancias():
+    resumen = resumen_ganancias()
+    print("")
+    for fila in resumen["filas"]:
+        print(fila["producto"], "| vendidas:", fila["vendidas"], "| ingresos:", fila["ingresos"],
+              "| costo:", fila["costo"], "| ganancia:", fila["ganancia"])
+    print("")
+    print("TOTAL ingresos:", round(resumen["ingresos"], 2))
+    print("TOTAL costos:", round(resumen["costos"], 2))
+    print("Ganancia de ventas:", round(resumen["ganancia_ventas"], 2))
+    print("Gastos extra:", round(resumen["gastos"], 2))
+    print("GANANCIA NETA:", round(resumen["ganancia_neta"], 2))
+    print("")
 def menu():
     opcion = ""
     while opcion != "7":
