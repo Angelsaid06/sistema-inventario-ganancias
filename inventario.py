@@ -71,7 +71,15 @@ def registrar_venta(producto_id, cantidad):
         print("Venta registrada")
 
     conexion.close()
+def calcular_ganancia(piezas_compradas, costo_compras, piezas_vendidas, ingresos):
+    if piezas_compradas > 0:
+        costo_promedio = costo_compras / piezas_compradas
+    else:
+        costo_promedio = 0
 
+    costo_vendido = costo_promedio * piezas_vendidas
+    ganancia = ingresos - costo_vendido
+    return costo_vendido, ganancia
 def reporte_ganancias():
     conexion = sqlite3.connect("inventario.db")
     cursor = conexion.cursor()
@@ -114,13 +122,7 @@ def reporte_ganancias():
             ingresos = 0
 
         # Costo promedio por pieza
-        if piezas_compradas > 0:
-            costo_promedio = costo_compras / piezas_compradas
-        else:
-            costo_promedio = 0
-
-        costo_vendido = costo_promedio * piezas_vendidas
-        ganancia = ingresos - costo_vendido
+            costo_vendido, ganancia = calcular_ganancia(piezas_compradas, costo_compras, piezas_vendidas, ingresos)
 
         if piezas_vendidas > 0:
             print(nombre, "| vendidas:", piezas_vendidas, "| ingresos:", ingresos,
@@ -168,4 +170,5 @@ def menu():
             reporte_ganancias()
 
 
-menu()
+if __name__ == "__main__":
+    menu()
