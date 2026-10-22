@@ -1,5 +1,5 @@
 \# Sistema de inventario y ganancias
-
+![Tests](https://github.com/Angelsaid06/sistema-inventario-ganancias/actions/workflows/tests.yml/badge.svg)
 
 
 Programa en Python para llevar el inventario de un negocio pequeño: registra productos, compras y ventas, actualiza las existencias automáticamente y calcula la ganancia real por producto.
