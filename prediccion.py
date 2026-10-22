@@ -1,4 +1,5 @@
 import sqlite3
+from sklearn.linear_model import LinearRegression
 from datetime import date, timedelta
 
 
@@ -48,3 +49,47 @@ def sugerir_reabasto(existencias, promedio_diario, dias_cubrir=7):
     if faltan <= 0:
         return 0
     return round(faltan)
+
+def armar_datos(ventas):
+    # Para cada dia (desde el octavo) arma: promedio de los 7 dias anteriores + dia de la semana
+    hoy = date.today()
+    filas = []
+    objetivos = []
+    baseline = []
+    for i in range(7, len(ventas)):
+        fecha = hoy - timedelta(days=len(ventas) - 1 - i)
+        previo = sum(ventas[i - 7:i]) / 7
+        fila = [previo]
+        for dia in range(7):
+            if fecha.weekday() == dia:
+                fila.append(1)
+            else:
+                fila.append(0)
+        filas.append(fila)
+        objetivos.append(ventas[i])
+        baseline.append(previo)
+    return filas, objetivos, baseline
+
+
+def error_promedio(reales, predichos):
+    total = 0
+    for i in range(len(reales)):
+        total = total + abs(reales[i] - predichos[i])
+    return total / len(reales)
+
+
+def comparar_modelos(ventas):
+    # Devuelve (error del promedio simple, error del modelo), o None si hay pocos datos
+    if len(ventas) < 30:
+        return None
+
+    filas, objetivos, baseline = armar_datos(ventas)
+    corte = int(len(filas) * 0.8)
+
+    modelo = LinearRegression()
+    modelo.fit(filas[:corte], objetivos[:corte])
+    predichos = modelo.predict(filas[corte:])
+
+    error_base = error_promedio(objetivos[corte:], baseline[corte:])
+    error_modelo = error_promedio(objetivos[corte:], predichos)
+    return error_base, error_modelo

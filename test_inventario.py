@@ -2,6 +2,8 @@ import sqlite3
 from database import crear_tablas
 from inventario import calcular_ganancia, registrar_compra, registrar_venta
 from prediccion import promedio_movil, dias_restantes, sugerir_reabasto
+from prediccion import comparar_modelos
+
 
 
 def test_ganancia_refrescos():
@@ -77,3 +79,6 @@ def test_dias_restantes():
 def test_sugerir_reabasto():
     assert sugerir_reabasto(5, 2, 7) == 9
     assert sugerir_reabasto(50, 2, 7) == 0
+
+def test_comparar_modelos_con_pocos_datos():
+    assert comparar_modelos([1, 2, 3]) is None
