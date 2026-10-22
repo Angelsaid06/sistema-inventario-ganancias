@@ -14,15 +14,15 @@ Nació de una necesidad real: vendo botanas en mi universidad y quería saber cu
 
 
 
-\- Agregar y consultar productos
-
-\- Registrar compras (suman existencias)
-
-\- Registrar ventas (restan existencias y avisan si no alcanza)
-
-\- Reporte de ingresos, costos y ganancia por producto y total
-
-\- Pruebas automáticas del cálculo de ganancias
+- Agregar y consultar productos
+- Registrar compras (suman existencias)
+- Registrar ventas (restan existencias y avisan si no alcanza)
+- Registrar gastos extra (bolsas, transporte, etc.)
+- Alertas de productos con pocas piezas o sin existencias
+- Reporte de ingresos, costos, ganancia de ventas y ganancia neta
+- Ventas por día y gráfica de productos más vendidos
+- Interfaz web con Streamlit y modo consola
+- Pruebas automáticas del cálculo de ganancias
 
 
 
@@ -112,15 +112,10 @@ py -m pytest
 
 
 
-\- Por ahora funciona solo en consola
-
-\- No incluye gastos extra (empaques, comisiones) ni fechas de caducidad
-
-\- Reportes por día o mes
-
-\- Alertas de poco inventario
-
-\- Interfaz web con Streamlit
+- La ganancia usa costo promedio por pieza (no distingue lotes con distinto costo)
+- Falta validar datos inválidos en el modo consola
+- Todavía no hay reporte por mes ni exportar a Excel
+- Pendiente publicar la app en línea
 
 ## Capturas
 
