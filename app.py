@@ -15,6 +15,14 @@ def obtener_productos():
 def pagina_productos():
     st.header("Productos")
     productos = obtener_productos()
+
+    # Alertas: productos con 5 piezas o menos
+    for fila in productos:
+        if fila[3] == 0:
+            st.error(fila[1] + ": SIN existencias")
+        elif fila[3] <= 5:
+            st.warning(fila[1] + ": quedan solo " + str(fila[3]) + " piezas")
+
     tabla = []
     for fila in productos:
         tabla.append({"Producto": fila[1], "Precio": fila[2], "Existencias": fila[3]})
@@ -141,7 +149,3 @@ elif pagina == "Registrar compra":
     pagina_compra()
 else:
     pagina_reporte()
-
-## Capturas
-
-![Reporte de ganancias](imagenes/reporte.png)
