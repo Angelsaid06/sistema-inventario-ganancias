@@ -16,6 +16,9 @@ def ver_productos():
 
 
 def agregar_producto(nombre, precio_venta):
+    if nombre.strip() == "" or precio_venta <= 0:
+        print("Nombre o precio invalido")
+        return
     conexion = sqlite3.connect("inventario.db")
     cursor = conexion.cursor()
     cursor.execute(
@@ -28,8 +31,16 @@ def agregar_producto(nombre, precio_venta):
 
 
 def registrar_compra(producto_id, cantidad, costo_total):
+    if cantidad <= 0 or costo_total < 0:
+        print("Cantidad o costo invalido")
+        return
     conexion = sqlite3.connect("inventario.db")
     cursor = conexion.cursor()
+    cursor.execute("SELECT id FROM productos WHERE id = ?", (producto_id,))
+    if cursor.fetchone() is None:
+        print("Ese producto no existe")
+        conexion.close()
+        return
     cursor.execute(
         "INSERT INTO compras (producto_id, cantidad, costo_total, fecha) VALUES (?, ?, ?, ?)",
         (producto_id, cantidad, costo_total, str(date.today()))
@@ -44,6 +55,9 @@ def registrar_compra(producto_id, cantidad, costo_total):
 
 
 def registrar_venta(producto_id, cantidad):
+    if cantidad <= 0:
+        print("La cantidad debe ser mayor a 0")
+        return
     conexion = sqlite3.connect("inventario.db")
     cursor = conexion.cursor()
 
@@ -139,6 +153,9 @@ def reporte_ganancias():
 
     conexion.close()
 def registrar_gasto(descripcion, monto):
+    if descripcion.strip() == "" or monto <= 0:
+        print("Descripcion o monto invalido")
+        return
     conexion = sqlite3.connect("inventario.db")
     cursor = conexion.cursor()
     cursor.execute(
@@ -148,36 +165,55 @@ def registrar_gasto(descripcion, monto):
     conexion.commit()
     conexion.close()
     print("Gasto registrado")
+def pedir_entero(texto):
+    while True:
+        try:
+            return int(input(texto))
+        except ValueError:
+            print("Escribe un numero entero")
+
+
+def pedir_decimal(texto):
+    while True:
+        try:
+            return float(input(texto))
+        except ValueError:
+            print("Escribe un numero valido")
 def menu():
     opcion = ""
-    while opcion != "6":
+    while opcion != "7":
         print("1. Ver productos")
         print("2. Agregar producto")
         print("3. Registrar compra")
         print("4. Registrar venta")
         print("5. Reporte de ganancias")
-        print("6. Salir")
+        print("6. Registrar gasto")
+        print("7. Salir")
         opcion = input("Elige una opcion: ")
 
         if opcion == "1":
             ver_productos()
         elif opcion == "2":
             nombre = input("Nombre: ")
-            precio = float(input("Precio de venta: "))
+            precio = pedir_decimal("Precio de venta: ")
             agregar_producto(nombre, precio)
         elif opcion == "3":
             ver_productos()
-            producto_id = int(input("ID del producto: "))
-            cantidad = int(input("Cantidad comprada: "))
-            costo_total = float(input("Costo total: "))
+            producto_id = pedir_entero("ID del producto: ")
+            cantidad = pedir_entero("Cantidad comprada: ")
+            costo_total = pedir_decimal("Costo total: ")
             registrar_compra(producto_id, cantidad, costo_total)
         elif opcion == "4":
             ver_productos()
-            producto_id = int(input("ID del producto: "))
-            cantidad = int(input("Cantidad vendida: "))
+            producto_id = pedir_entero("ID del producto: ")
+            cantidad = pedir_entero("Cantidad vendida: ")
             registrar_venta(producto_id, cantidad)
         elif opcion == "5":
             reporte_ganancias()
+        elif opcion == "6":
+            descripcion = input("Descripcion del gasto: ")
+            monto = pedir_decimal("Monto: ")
+            registrar_gasto(descripcion, monto)
 
 
 if __name__ == "__main__":

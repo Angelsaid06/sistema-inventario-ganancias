@@ -82,3 +82,21 @@ def test_sugerir_reabasto():
 
 def test_comparar_modelos_con_pocos_datos():
     assert comparar_modelos([1, 2, 3]) is None
+
+def test_compra_con_cantidad_negativa_no_cambia_nada(tmp_path, monkeypatch):
+    preparar_base(tmp_path, monkeypatch)
+    registrar_compra(1, -5, 50)
+    assert leer_existencias() == 0
+
+
+def test_compra_de_producto_que_no_existe(tmp_path, monkeypatch):
+    preparar_base(tmp_path, monkeypatch)
+    registrar_compra(99, 5, 50)
+    assert leer_existencias() == 0
+
+
+def test_venta_con_cantidad_cero(tmp_path, monkeypatch):
+    preparar_base(tmp_path, monkeypatch)
+    registrar_compra(1, 5, 50)
+    registrar_venta(1, 0)
+    assert leer_existencias() == 5
