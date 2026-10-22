@@ -126,6 +126,50 @@ La app estima cuántos días le quedan a cada producto y cuántas piezas convien
 
 Para generar la demo y evaluar: `py generar_demo.py` y `py evaluar.py`.
 
+## Asistente de compras con IA
+
+Chat con Claude (API de Anthropic) que recomienda qué comprar. No inventa datos: usa herramientas que consultan la base de datos real.
+
+| Herramienta | Qué consulta |
+|---|---|
+| `ver_inventario` | Productos, precio de venta, costo promedio y existencias |
+| `ventas_recientes` | Piezas vendidas por producto en los últimos N días |
+| `prediccion_reabasto` | Días que le quedan a cada producto y cuánto reponer |
+| `precios_proveedor` | Precios por pieza que el dueño registró de cada tienda |
+| `registrar_recomendacion` | Guarda cada recomendación para evaluarla después |
+
+```
+app.py (Streamlit) --> asistente.py --> API de Claude
+                            |
+                            +--> herramientas --> SQLite (inventario.db)
+```
+
+El asistente no ejecuta compras: la decisión final es del dueño. Si faltan datos (por ejemplo, precios de proveedor o pocas ventas), debe decirlo en vez de inventar.
+
+### Configuración
+
+1. Crea una clave en la consola de la API de Anthropic.
+2. Guárdala como variable de entorno (nunca en el código ni en el repositorio):
+```
+   setx ANTHROPIC_API_KEY "tu_clave"
+```
+3. Cierra y vuelve a abrir la terminal, y corre la app.
+
+## Evaluación del asistente
+
+Cada recomendación se guarda. Pasados 7 días se compara contra lo que realmente se vendió, y también contra la regla simple (promedio de 7 días).
+
+Error = |existencias + piezas sugeridas − piezas vendidas en los 7 días siguientes|. Menor es mejor.
+
+**Resultados con ventas reales:** pendiente. Se actualizará con el número de recomendaciones evaluadas y las fechas.
+
+**Limitaciones de la evaluación:** pocas recomendaciones, y si un producto se agota, la demanda real se subestima.
+
+## Capturas
+
+![Asistente](imagenes/asistente.png)
+![Predicción](imagenes/prediccion.png)
+
 \## Limitaciones y mejoras futuras
 
 

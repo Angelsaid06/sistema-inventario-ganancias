@@ -5,6 +5,11 @@ import pandas as pd
 from inventario import registrar_compra, registrar_venta, calcular_ganancia, registrar_gasto
 from prediccion import ventas_por_dia, promedio_movil, dias_restantes, sugerir_reabasto, comparar_modelos
 from asistente import preguntar, crear_tabla_precios, registrar_precio, precios_proveedor, evaluar_recomendaciones, resumen_evaluacion
+from database import crear_tablas
+
+if not os.path.exists("inventario.db"):
+    crear_tablas()
+    import cargar_datos
 
 def obtener_productos():
     conexion = sqlite3.connect("inventario.db")
@@ -324,7 +329,7 @@ def pagina_asistente():
     st.header("Asistente de compras")
 
     if os.environ.get("ANTHROPIC_API_KEY") is None:
-        st.error("Falta la clave de la API (variable de entorno ANTHROPIC_API_KEY).")
+        st.info("El asistente esta desactivado en esta demo publica. Para probarlo, clona el repositorio y configura tu propia clave (mira el README).")
         return
 
     fuente = st.radio("Datos", ["Mis datos", "Datos de demo (inventados)"])
