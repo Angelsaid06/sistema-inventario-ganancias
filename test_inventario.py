@@ -4,6 +4,8 @@ from inventario import calcular_ganancia, registrar_compra, registrar_venta
 from prediccion import promedio_movil, dias_restantes, sugerir_reabasto
 from prediccion import comparar_modelos
 from asistente import ver_inventario, ejecutar_herramienta
+from datetime import date, timedelta
+from asistente import guardar_recomendacion, evaluar_recomendaciones, resumen_evaluacion
 
 
 
@@ -113,3 +115,37 @@ def test_ver_inventario_calcula_costo_promedio(tmp_path, monkeypatch):
 def test_herramienta_desconocida():
     resultado = ejecutar_herramienta("no_existe", {}, "inventario.db")
     assert "error" in resultado
+
+
+def test_recomendacion_de_hoy_esta_pendiente(tmp_path, monkeypatch):
+    preparar_base(tmp_path, monkeypatch)
+    registrar_compra(1, 10, 100)
+    guardar_recomendacion("inventario.db", 1, 5)
+    evaluadas, pendientes = evaluar_recomendaciones("inventario.db", 7)
+    assert pendientes == 1
+    assert evaluadas == []
+
+
+def test_evaluar_con_ventas_posteriores(tmp_path, monkeypatch):
+    preparar_base(tmp_path, monkeypatch)
+    registrar_compra(1, 10, 100)
+    guardar_recomendacion("inventario.db", 1, 5)
+
+    manana = str(date.today() + timedelta(days=1))
+    conexion = sqlite3.connect("inventario.db")
+    conexion.execute(
+        "INSERT INTO ventas (producto_id, cantidad, precio_unitario, fecha) VALUES (1, 12, 15, ?)",
+        (manana,)
+    )
+    conexion.commit()
+    conexion.close()
+
+    en_diez_dias = date.today() + timedelta(days=10)
+    evaluadas, pendientes = evaluar_recomendaciones("inventario.db", 7, en_diez_dias)
+    assert evaluadas[0]["vendido_en_7_dias"] == 12
+    assert evaluadas[0]["error_asistente"] == 3
+    assert evaluadas[0]["alcanzo"] is True
+
+
+def test_resumen_sin_datos():
+    assert resumen_evaluacion([]) is None

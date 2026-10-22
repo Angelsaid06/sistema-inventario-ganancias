@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 from inventario import registrar_compra, registrar_venta, calcular_ganancia, registrar_gasto
 from prediccion import ventas_por_dia, promedio_movil, dias_restantes, sugerir_reabasto, comparar_modelos
-from asistente import preguntar, crear_tabla_precios, registrar_precio, precios_proveedor
+from asistente import preguntar, crear_tabla_precios, registrar_precio, precios_proveedor, evaluar_recomendaciones, resumen_evaluacion
 
 def obtener_productos():
     conexion = sqlite3.connect("inventario.db")
@@ -361,11 +361,27 @@ def pagina_asistente():
         except Exception as error:
             st.session_state.chat.append({"rol": "assistant", "texto": "Error: " + str(error)})
         st.rerun()
+def pagina_evaluacion():
+    st.header("Evaluacion de las recomendaciones")
+    evaluadas, pendientes = evaluar_recomendaciones("inventario.db", 7)
+    st.write("Recomendaciones esperando sus 7 dias:", pendientes)
+
+    resumen = resumen_evaluacion(evaluadas)
+    if resumen is None:
+        st.write("Todavia no hay recomendaciones con 7 dias cumplidos.")
+        return
+
+    st.write("Recomendaciones evaluadas:", resumen["n"])
+    st.write("Error promedio del asistente (piezas):", resumen["error_asistente"])
+    st.write("Error promedio de la regla simple (piezas):", resumen["error_regla"])
+    st.write("Veces que lo sugerido alcanzo para la demanda: " + str(resumen["porcentaje_alcanzo"]) + "%")
+    st.table(evaluadas)
+    st.caption("Error = |existencias + piezas sugeridas - piezas vendidas en los 7 dias siguientes|. Menor es mejor. Si un producto se agota, la demanda real se subestima.")
 st.title("Inventario y ganancias")
 
 pagina = st.sidebar.radio(
     "Menu",
-    ["Productos", "Registrar venta", "Registrar compra", "Gastos", "Reporte de ganancias", "Ventas por dia", "Reporte por mes", "Prediccion", "Precios de proveedores", "Asistente"]
+    ["Productos", "Registrar venta", "Registrar compra", "Gastos", "Reporte de ganancias", "Ventas por dia", "Reporte por mes", "Prediccion", "Precios de proveedores", "Asistente", "Evaluacion]
 )
 
 if pagina == "Productos":
@@ -386,5 +402,7 @@ elif pagina == "Prediccion":
     pagina_prediccion()
 elif pagina == "Precios de proveedores":
     pagina_precios()
-else:
+elif pagina == "Asistente":
     pagina_asistente()
+else:
+    pagina_evaluacion()

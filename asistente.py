@@ -129,7 +129,125 @@ def precios_proveedor(nombre_db):
         })
     return lista
 
+def crear_tabla_recomendaciones(nombre_db):
+    conexion = sqlite3.connect(nombre_db)
+    cursor = conexion.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS recomendaciones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha TEXT NOT NULL,
+            producto_id INTEGER NOT NULL,
+            cantidad_sugerida INTEGER NOT NULL,
+            existencias_al_momento INTEGER NOT NULL,
+            sugerencia_base INTEGER NOT NULL,
+            FOREIGN KEY (producto_id) REFERENCES productos(id)
+        )
+    """)
+    conexion.commit()
+    conexion.close()
 
+
+def guardar_recomendacion(nombre_db, producto_id, cantidad):
+    if producto_id is None or cantidad is None or cantidad < 0:
+        return {"error": "Datos invalidos"}
+
+    crear_tabla_recomendaciones(nombre_db)
+    conexion = sqlite3.connect(nombre_db)
+    cursor = conexion.cursor()
+    cursor.execute("SELECT existencias FROM productos WHERE id = ?", (producto_id,))
+    fila = cursor.fetchone()
+    conexion.close()
+    if fila is None:
+        return {"error": "Ese producto no existe"}
+    existencias = fila[0]
+
+    # Lo que sugeriria la regla simple (promedio de 7 dias)
+    ventas = ventas_por_dia(nombre_db, producto_id)
+    promedio = promedio_movil(ventas, 7)
+    base = sugerir_reabasto(existencias, promedio, 7)
+
+    conexion = sqlite3.connect(nombre_db)
+    cursor = conexion.cursor()
+    # Si ya habia una recomendacion de hoy para este producto, se reemplaza
+    cursor.execute(
+        "DELETE FROM recomendaciones WHERE producto_id = ? AND fecha = ?",
+        (producto_id, str(date.today()))
+    )
+    cursor.execute(
+        "INSERT INTO recomendaciones (fecha, producto_id, cantidad_sugerida, existencias_al_momento, sugerencia_base) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (str(date.today()), producto_id, cantidad, existencias, base)
+    )
+    conexion.commit()
+    conexion.close()
+    return {"guardado": True}
+
+
+def evaluar_recomendaciones(nombre_db, dias=7, hoy=None):
+    if hoy is None:
+        hoy = date.today()
+    crear_tabla_recomendaciones(nombre_db)
+
+    conexion = sqlite3.connect(nombre_db)
+    cursor = conexion.cursor()
+    cursor.execute(
+        "SELECT recomendaciones.fecha, productos.nombre, recomendaciones.producto_id, "
+        "recomendaciones.cantidad_sugerida, recomendaciones.existencias_al_momento, "
+        "recomendaciones.sugerencia_base "
+        "FROM recomendaciones JOIN productos ON recomendaciones.producto_id = productos.id "
+        "ORDER BY recomendaciones.fecha"
+    )
+    filas = cursor.fetchall()
+
+    evaluadas = []
+    pendientes = 0
+    for fila in filas:
+        fecha = date.fromisoformat(fila[0])
+        fin = fecha + timedelta(days=dias)
+        if fin > hoy:
+            pendientes = pendientes + 1
+        else:
+            cursor.execute(
+                "SELECT SUM(cantidad) FROM ventas WHERE producto_id = ? AND fecha > ? AND fecha <= ?",
+                (fila[2], str(fecha), str(fin))
+            )
+            demanda = cursor.fetchone()[0]
+            if demanda is None:
+                demanda = 0
+            disponible_ia = fila[4] + fila[3]
+            disponible_regla = fila[4] + fila[5]
+            evaluadas.append({
+                "fecha": fila[0],
+                "producto": fila[1],
+                "sugerido_asistente": fila[3],
+                "sugerido_regla": fila[5],
+                "vendido_en_7_dias": demanda,
+                "error_asistente": abs(disponible_ia - demanda),
+                "error_regla": abs(disponible_regla - demanda),
+                "alcanzo": disponible_ia >= demanda,
+            })
+    conexion.close()
+    return evaluadas, pendientes
+
+
+def resumen_evaluacion(evaluadas):
+    if len(evaluadas) == 0:
+        return None
+    total_asistente = 0
+    total_regla = 0
+    alcanzaron = 0
+    for fila in evaluadas:
+        total_asistente = total_asistente + fila["error_asistente"]
+        total_regla = total_regla + fila["error_regla"]
+        if fila["alcanzo"]:
+            alcanzaron = alcanzaron + 1
+    n = len(evaluadas)
+    return {
+        "n": n,
+        "error_asistente": round(total_asistente / n, 2),
+        "error_regla": round(total_regla / n, 2),
+        "porcentaje_alcanzo": round(100 * alcanzaron / n),
+    }
 def ejecutar_herramienta(nombre, datos, nombre_db):
     if nombre == "ver_inventario":
         return ver_inventario(nombre_db)
@@ -139,6 +257,8 @@ def ejecutar_herramienta(nombre, datos, nombre_db):
         return prediccion_reabasto(nombre_db)
     if nombre == "precios_proveedor":
         return precios_proveedor(nombre_db)
+    if nombre == "registrar_recomendacion":
+        return guardar_recomendacion(nombre_db, datos.get("producto_id"), datos.get("cantidad"))
     return {"error": "Herramienta desconocida"}
 
 
@@ -167,6 +287,18 @@ HERRAMIENTAS = [
         "description": "Devuelve los precios por pieza que el dueno ha registrado de distintos proveedores o tiendas.",
         "input_schema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "registrar_recomendacion",
+        "description": "Guarda una recomendacion de compra (producto y cantidad de piezas a comprar) para evaluarla despues contra las ventas reales.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "producto_id": {"type": "integer", "description": "Id del producto, tal como lo devuelve ver_inventario"},
+                "cantidad": {"type": "integer", "description": "Piezas que recomiendas comprar"},
+            },
+            "required": ["producto_id", "cantidad"],
+        },
+    },
 ]
 
 
@@ -189,6 +321,8 @@ def armar_instrucciones():
         "o pocas ventas registradas), dilo claramente y pide ese dato. "
         "Explica tu razonamiento con los numeros de las herramientas. "
         "Entrega las recomendaciones como una lista de compra con cantidades. "
+        "Cuando des una lista de compra, llama a registrar_recomendacion una vez por cada producto "
+        "recomendado (usa el id que devuelve ver_inventario), para poder evaluarla despues. "
         "No puedes ejecutar compras: la decision final es del dueno. "
         "Responde en espanol y de forma breve."
     )
