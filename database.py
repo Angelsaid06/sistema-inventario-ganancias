@@ -47,5 +47,9 @@ def crear_tablas():
     conexion.close()
 
 
-crear_tablas()
-print("Tablas creadas")
+
+
+
+if __name__ == "__main__":
+    crear_tablas()
+    print("Tablas creadas")
