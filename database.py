@@ -35,7 +35,14 @@ def crear_tablas():
             FOREIGN KEY (producto_id) REFERENCES productos(id)
         )
     """)
-
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS gastos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            descripcion TEXT NOT NULL,
+            monto REAL NOT NULL,
+            fecha TEXT NOT NULL
+        )
+    """)
     conexion.commit()
     conexion.close()
 

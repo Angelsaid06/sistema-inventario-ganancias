@@ -138,6 +138,16 @@ def reporte_ganancias():
     print("")
 
     conexion.close()
+def registrar_gasto(descripcion, monto):
+    conexion = sqlite3.connect("inventario.db")
+    cursor = conexion.cursor()
+    cursor.execute(
+        "INSERT INTO gastos (descripcion, monto, fecha) VALUES (?, ?, ?)",
+        (descripcion, monto, str(date.today()))
+    )
+    conexion.commit()
+    conexion.close()
+    print("Gasto registrado")
 def menu():
     opcion = ""
     while opcion != "6":

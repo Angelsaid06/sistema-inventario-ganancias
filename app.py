@@ -1,7 +1,7 @@
 import sqlite3
 import streamlit as st
 import pandas as pd
-from inventario import registrar_compra, registrar_venta, calcular_ganancia
+from inventario import registrar_compra, registrar_venta, calcular_ganancia, registrar_gasto
 
 
 def obtener_productos():
@@ -122,7 +122,10 @@ def pagina_reporte():
 
         total_ingresos = total_ingresos + ingresos
         total_costos = total_costos + costo_vendido
-
+    cursor.execute("SELECT SUM(monto) FROM gastos")
+    total_gastos = cursor.fetchone()[0]
+    if total_gastos is None:
+        total_gastos = 0
     conexion.close()
 
     if len(tabla) > 0:
@@ -132,7 +135,9 @@ def pagina_reporte():
 
     st.write("Ingresos totales:", round(total_ingresos, 2))
     st.write("Costos totales:", round(total_costos, 2))
-    st.subheader("Ganancia total: " + str(round(total_ingresos - total_costos, 2)))
+    st.write("Ganancia de ventas:", round(total_ingresos - total_costos, 2))
+    st.write("Gastos extra:", round(total_gastos, 2))
+    st.subheader("Ganancia neta: " + str(round(total_ingresos - total_costos - total_gastos, 2)))
 
 def pagina_ventas_dia():
     st.header("Ventas por dia")
@@ -165,11 +170,34 @@ def pagina_ventas_dia():
         datos = pd.DataFrame(mas_vendidos, columns=["Producto", "Vendidas"])
         datos = datos.set_index("Producto")
         st.bar_chart(datos)
+def pagina_gastos():
+    st.header("Gastos extra")
+    descripcion = st.text_input("Descripcion (ejemplo: bolsas, transporte)")
+    monto = st.number_input("Monto", min_value=0.0, step=1.0)
+
+    if st.button("Registrar gasto"):
+        if descripcion == "":
+            st.error("Escribe una descripcion")
+        else:
+            registrar_gasto(descripcion, monto)
+            st.success("Gasto registrado")
+
+    conexion = sqlite3.connect("inventario.db")
+    cursor = conexion.cursor()
+    cursor.execute("SELECT fecha, descripcion, monto FROM gastos ORDER BY fecha DESC")
+    filas = cursor.fetchall()
+    conexion.close()
+
+    if len(filas) > 0:
+        tabla = []
+        for fila in filas:
+            tabla.append({"Fecha": fila[0], "Descripcion": fila[1], "Monto": fila[2]})
+        st.table(tabla)
 st.title("Inventario y ganancias")
 
 pagina = st.sidebar.radio(
     "Menu",
-    ["Productos", "Registrar venta", "Registrar compra", "Reporte de ganancias", "Ventas por dia"]
+    ["Productos", "Registrar venta", "Registrar compra", "Gastos", "Reporte de ganancias", "Ventas por dia"]
 )
 
 if pagina == "Productos":
@@ -178,8 +206,8 @@ elif pagina == "Registrar venta":
     pagina_venta()
 elif pagina == "Registrar compra":
     pagina_compra()
-elif pagina == "Reporte de ganancias":
-    pagina_reporte()
+elif pagina == "Gastos":
+    pagina_gastos()
 elif pagina == "Reporte de ganancias":
     pagina_reporte()
 else:
