@@ -3,7 +3,7 @@ import sqlite3
 import streamlit as st
 import pandas as pd
 from datetime import date
-from inventario import registrar_compra, registrar_venta, registrar_gasto, listar_productos, resumen_ganancias
+from inventario import registrar_compra, registrar_venta, registrar_gasto, listar_productos, resumen_ganancias, agregar_producto, ultimas_ventas, cancelar_venta
 from prediccion import ventas_por_dia, promedio_movil, dias_restantes, sugerir_reabasto, comparar_modelos
 from asistente import preguntar, crear_tabla_precios, registrar_precio, precios_proveedor, evaluar_recomendaciones, resumen_evaluacion
 from database import crear_tablas
@@ -400,8 +400,18 @@ def pagina_venta_rapida():
             registrar_venta(fila[0], 1)
             st.session_state.ultima_venta = "Vendido: " + fila[1]
             st.rerun()
-st.set_page_config(page_title="Inventario y ganancias", page_icon="🛒")
-st.title("Inventario y ganancias")
+
+    st.subheader("Ultimas ventas")
+    ventas = ultimas_ventas(5)
+    if len(ventas) == 0:
+        st.write("Todavia no hay ventas")
+    for venta in ventas:
+        columna1, columna2 = st.columns([3, 1])
+        columna1.write(str(venta[2]) + " x " + venta[1] + "  ($" + str(venta[3]) + " c/u)  " + venta[4])
+        if columna2.button("Cancelar", key="cancelar_" + str(venta[0])):
+            cancelar_venta(venta[0])
+            st.session_state.ultima_venta = "Venta cancelada: " + venta[1]
+            st.rerun()
 
 pagina = st.sidebar.radio(
     "Menu",

@@ -208,6 +208,42 @@ def reporte_ganancias():
     print("Gastos extra:", round(resumen["gastos"], 2))
     print("GANANCIA NETA:", round(resumen["ganancia_neta"], 2))
     print("")
+
+def ultimas_ventas(limite=10, nombre_db="inventario.db"):
+    conexion = sqlite3.connect(nombre_db)
+    cursor = conexion.cursor()
+    cursor.execute(
+        "SELECT ventas.id, productos.nombre, ventas.cantidad, ventas.precio_unitario, ventas.fecha "
+        "FROM ventas JOIN productos ON ventas.producto_id = productos.id "
+        "ORDER BY ventas.id DESC LIMIT ?",
+        (limite,)
+    )
+    filas = cursor.fetchall()
+    conexion.close()
+    return filas
+
+
+def cancelar_venta(venta_id, nombre_db="inventario.db"):
+    conexion = sqlite3.connect(nombre_db)
+    cursor = conexion.cursor()
+
+    cursor.execute("SELECT producto_id, cantidad FROM ventas WHERE id = ?", (venta_id,))
+    venta = cursor.fetchone()
+    if venta is None:
+        conexion.close()
+        print("Esa venta no existe")
+        return False
+
+    # Regresamos las piezas al inventario y borramos la venta
+    cursor.execute(
+        "UPDATE productos SET existencias = existencias + ? WHERE id = ?",
+        (venta[1], venta[0])
+    )
+    cursor.execute("DELETE FROM ventas WHERE id = ?", (venta_id,))
+    conexion.commit()
+    conexion.close()
+    print("Venta cancelada")
+    return True
 def menu():
     opcion = ""
     while opcion != "7":

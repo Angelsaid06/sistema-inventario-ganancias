@@ -7,6 +7,7 @@ from asistente import ver_inventario, ejecutar_herramienta
 from datetime import date, timedelta
 from asistente import guardar_recomendacion, evaluar_recomendaciones, resumen_evaluacion
 from inventario import resumen_ganancias
+from inventario import cancelar_venta, ultimas_ventas
 
 
 
@@ -159,3 +160,19 @@ def test_resumen_ganancias(tmp_path, monkeypatch):
     assert resumen["ingresos"] == 150
     assert resumen["costos"] == 100
     assert resumen["ganancia_neta"] == 50
+
+def test_cancelar_venta_regresa_las_piezas(tmp_path, monkeypatch):
+    preparar_base(tmp_path, monkeypatch)
+    registrar_compra(1, 10, 100)
+    registrar_venta(1, 3)
+    assert leer_existencias() == 7
+
+    venta_id = ultimas_ventas(1)[0][0]
+    assert cancelar_venta(venta_id) is True
+    assert leer_existencias() == 10
+    assert ultimas_ventas(1) == []
+
+
+def test_cancelar_venta_que_no_existe(tmp_path, monkeypatch):
+    preparar_base(tmp_path, monkeypatch)
+    assert cancelar_venta(99) is False
