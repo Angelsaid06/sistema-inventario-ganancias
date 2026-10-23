@@ -244,6 +244,74 @@ def cancelar_venta(venta_id, nombre_db="inventario.db"):
     conexion.close()
     print("Venta cancelada")
     return True
+def ultimas_compras(limite=10, nombre_db="inventario.db"):
+    conexion = sqlite3.connect(nombre_db)
+    cursor = conexion.cursor()
+    cursor.execute(
+        "SELECT compras.id, productos.nombre, compras.cantidad, compras.costo_total, compras.fecha "
+        "FROM compras JOIN productos ON compras.producto_id = productos.id "
+        "ORDER BY compras.id DESC LIMIT ?",
+        (limite,)
+    )
+    filas = cursor.fetchall()
+    conexion.close()
+    return filas
+
+
+def cancelar_compra(compra_id, nombre_db="inventario.db"):
+    conexion = sqlite3.connect(nombre_db)
+    cursor = conexion.cursor()
+
+    cursor.execute("SELECT producto_id, cantidad FROM compras WHERE id = ?", (compra_id,))
+    compra = cursor.fetchone()
+    if compra is None:
+        conexion.close()
+        print("Esa compra no existe")
+        return False
+
+    cursor.execute("SELECT existencias FROM productos WHERE id = ?", (compra[0],))
+    existencias = cursor.fetchone()[0]
+    if existencias < compra[1]:
+        conexion.close()
+        print("No se puede cancelar: ya se vendieron piezas de esa compra")
+        return False
+
+    cursor.execute(
+        "UPDATE productos SET existencias = existencias - ? WHERE id = ?",
+        (compra[1], compra[0])
+    )
+    cursor.execute("DELETE FROM compras WHERE id = ?", (compra_id,))
+    conexion.commit()
+    conexion.close()
+    print("Compra cancelada")
+    return True
+
+
+def ultimos_gastos(limite=10, nombre_db="inventario.db"):
+    conexion = sqlite3.connect(nombre_db)
+    cursor = conexion.cursor()
+    cursor.execute(
+        "SELECT id, descripcion, monto, fecha FROM gastos ORDER BY id DESC LIMIT ?",
+        (limite,)
+    )
+    filas = cursor.fetchall()
+    conexion.close()
+    return filas
+
+
+def cancelar_gasto(gasto_id, nombre_db="inventario.db"):
+    conexion = sqlite3.connect(nombre_db)
+    cursor = conexion.cursor()
+    cursor.execute("SELECT id FROM gastos WHERE id = ?", (gasto_id,))
+    if cursor.fetchone() is None:
+        conexion.close()
+        print("Ese gasto no existe")
+        return False
+    cursor.execute("DELETE FROM gastos WHERE id = ?", (gasto_id,))
+    conexion.commit()
+    conexion.close()
+    print("Gasto cancelado")
+    return True
 def menu():
     opcion = ""
     while opcion != "7":

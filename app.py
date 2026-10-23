@@ -3,7 +3,7 @@ import sqlite3
 import streamlit as st
 import pandas as pd
 from datetime import date
-from inventario import registrar_compra, registrar_venta, registrar_gasto, listar_productos, resumen_ganancias, agregar_producto, ultimas_ventas, cancelar_venta
+from inventario import registrar_compra, registrar_venta, registrar_gasto, listar_productos, resumen_ganancias, agregar_producto, ultimas_ventas, cancelar_venta, ultimas_compras, cancelar_compra, ultimos_gastos, cancelar_gasto
 from prediccion import ventas_por_dia, promedio_movil, dias_restantes, sugerir_reabasto, comparar_modelos
 from asistente import preguntar, crear_tabla_precios, registrar_precio, precios_proveedor, evaluar_recomendaciones, resumen_evaluacion
 from database import crear_tablas
@@ -80,6 +80,11 @@ def pagina_venta():
 
 def pagina_compra():
     st.header("Registrar compra")
+
+    aviso = st.session_state.pop("aviso", None)
+    if aviso is not None:
+        st.success(aviso)
+
     productos = listar_productos()
     if len(productos) == 0:
         st.write("Primero agrega productos en la seccion Productos")
@@ -100,9 +105,22 @@ def pagina_compra():
         registrar_compra(producto_id, int(cantidad), costo_total)
         st.success("Compra registrada")
 
+    st.subheader("Ultimas compras")
+    compras = ultimas_compras(5)
+    if len(compras) == 0:
+        st.write("Todavia no hay compras")
+    for compra in compras:
+        columna1, columna2 = st.columns([3, 1])
+        columna1.write(str(compra[2]) + " x " + compra[1] + "  ($" + str(compra[3]) + " en total)  " + compra[4])
+        if columna2.button("Cancelar", key="cancelar_compra_" + str(compra[0])):
+            if cancelar_compra(compra[0]):
+                st.session_state.aviso = "Compra cancelada: " + compra[1]
+                st.rerun()
+            else:
+                st.error("No se puede cancelar: ya se vendieron piezas de esa compra")
 
-def pagina_reporte():
-    st.header("Reporte de ganancias")
+
+def contenido_ganancias():
     resumen = resumen_ganancias()
 
     if len(resumen["filas"]) > 0:
@@ -116,6 +134,9 @@ def pagina_reporte():
                 "Ganancia": fila["ganancia"],
             })
         st.table(tabla)
+        grafica = pd.DataFrame(tabla).set_index("Producto")[["Ganancia"]]
+        st.subheader("Ganancia por producto")
+        st.bar_chart(grafica)
     else:
         st.write("Todavia no hay ventas registradas")
 
@@ -126,8 +147,7 @@ def pagina_reporte():
     st.subheader("Ganancia neta: " + str(round(resumen["ganancia_neta"], 2)))
 
 
-def pagina_ventas_dia():
-    st.header("Ventas por dia")
+def contenido_dia():
     conexion = sqlite3.connect("inventario.db")
     cursor = conexion.cursor()
 
@@ -153,6 +173,10 @@ def pagina_ventas_dia():
             tabla.append({"Fecha": fila[0], "Piezas": fila[1], "Ingresos": fila[2]})
         st.table(tabla)
 
+        diario = pd.DataFrame(por_dia, columns=["Fecha", "Piezas", "Ingresos"]).set_index("Fecha")
+        st.subheader("Ingresos por dia")
+        st.line_chart(diario[["Ingresos"]])
+
         st.subheader("Productos mas vendidos")
         datos = pd.DataFrame(mas_vendidos, columns=["Producto", "Vendidas"])
         datos = datos.set_index("Producto")
@@ -161,6 +185,11 @@ def pagina_ventas_dia():
 
 def pagina_gastos():
     st.header("Gastos extra")
+
+    aviso = st.session_state.pop("aviso", None)
+    if aviso is not None:
+        st.success(aviso)
+
     descripcion = st.text_input("Descripcion (ejemplo: bolsas, transporte)")
     monto = st.number_input("Monto", min_value=0.0, step=1.0)
 
@@ -171,21 +200,20 @@ def pagina_gastos():
             registrar_gasto(descripcion, monto)
             st.success("Gasto registrado")
 
-    conexion = sqlite3.connect("inventario.db")
-    cursor = conexion.cursor()
-    cursor.execute("SELECT fecha, descripcion, monto FROM gastos ORDER BY fecha DESC")
-    filas = cursor.fetchall()
-    conexion.close()
+    st.subheader("Ultimos gastos")
+    gastos = ultimos_gastos(10)
+    if len(gastos) == 0:
+        st.write("Todavia no hay gastos")
+    for gasto in gastos:
+        columna1, columna2 = st.columns([3, 1])
+        columna1.write(gasto[1] + "  ($" + str(gasto[2]) + ")  " + gasto[3])
+        if columna2.button("Cancelar", key="cancelar_gasto_" + str(gasto[0])):
+            cancelar_gasto(gasto[0])
+            st.session_state.aviso = "Gasto cancelado: " + gasto[1]
+            st.rerun()
 
-    if len(filas) > 0:
-        tabla = []
-        for fila in filas:
-            tabla.append({"Fecha": fila[0], "Descripcion": fila[1], "Monto": fila[2]})
-        st.table(tabla)
 
-
-def pagina_mes():
-    st.header("Reporte por mes")
+def contenido_mes():
     conexion = sqlite3.connect("inventario.db")
     cursor = conexion.cursor()
 
@@ -216,6 +244,17 @@ def pagina_mes():
         )
         csv = datos.to_csv(index=False)
         st.download_button("Descargar ventas en CSV", csv, "ventas.csv", "text/csv")
+
+
+def pagina_reportes():
+    st.header("Reportes")
+    pestana1, pestana2, pestana3 = st.tabs(["Ganancias", "Por dia", "Por mes"])
+    with pestana1:
+        contenido_ganancias()
+    with pestana2:
+        contenido_dia()
+    with pestana3:
+        contenido_mes()
 
 
 def pagina_prediccion():
@@ -380,7 +419,7 @@ def pagina_inicio():
     columna_b.page_link(p_productos, label="Productos", icon="📦")
     columna_c, columna_d = st.columns(2)
     columna_c.page_link(p_compra, label="Registrar compra", icon="🛒")
-    columna_d.page_link(p_reporte, label="Ganancias", icon="💰")
+    columna_d.page_link(p_reportes, label="Reportes", icon="📊")
 
     productos = listar_productos()
     if len(productos) == 0:
@@ -505,18 +544,15 @@ p_productos = st.Page(pagina_productos, title="Productos", icon="📦")
 p_compra = st.Page(pagina_compra, title="Registrar compra", icon="🛒")
 p_gastos = st.Page(pagina_gastos, title="Gastos", icon="💸")
 p_precios = st.Page(pagina_precios, title="Precios de proveedores", icon="🏷️")
-p_reporte = st.Page(pagina_reporte, title="Ganancias", icon="💰")
-p_dia = st.Page(pagina_ventas_dia, title="Ventas por dia", icon="📅")
-p_mes = st.Page(pagina_mes, title="Reporte por mes", icon="🗓️")
+p_reportes = st.Page(pagina_reportes, title="Reportes", icon="📊")
 p_prediccion = st.Page(pagina_prediccion, title="Prediccion", icon="🔮")
 p_asistente = st.Page(pagina_asistente, title="Asistente", icon="🤖")
 p_evaluacion = st.Page(pagina_evaluacion, title="Evaluacion", icon="📈")
 
 navegacion = st.navigation({
-    "Principal": [p_inicio, p_venta_rapida],
-    "Ventas": [p_venta],
+    "Principal": [p_inicio, p_venta_rapida, p_venta],
     "Inventario": [p_productos, p_compra, p_gastos, p_precios],
-    "Reportes": [p_reporte, p_dia, p_mes],
+    "Reportes": [p_reportes],
     "Inteligencia": [p_prediccion, p_asistente, p_evaluacion],
 })
 navegacion.run()

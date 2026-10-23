@@ -1,14 +1,11 @@
 import sqlite3
-from database import crear_tablas
-from inventario import calcular_ganancia, registrar_compra, registrar_venta
-from prediccion import promedio_movil, dias_restantes, sugerir_reabasto
-from prediccion import comparar_modelos
-from asistente import ver_inventario, ejecutar_herramienta
 from datetime import date, timedelta
+from database import crear_tablas
+from inventario import calcular_ganancia, registrar_compra, registrar_venta, registrar_gasto, resumen_ganancias
+from inventario import cancelar_venta, ultimas_ventas, cancelar_compra, ultimas_compras, cancelar_gasto, ultimos_gastos
+from prediccion import promedio_movil, dias_restantes, sugerir_reabasto, comparar_modelos
+from asistente import ver_inventario, ejecutar_herramienta
 from asistente import guardar_recomendacion, evaluar_recomendaciones, resumen_evaluacion
-from inventario import resumen_ganancias
-from inventario import cancelar_venta, ultimas_ventas
-
 
 
 def test_ganancia_refrescos():
@@ -176,3 +173,28 @@ def test_cancelar_venta_regresa_las_piezas(tmp_path, monkeypatch):
 def test_cancelar_venta_que_no_existe(tmp_path, monkeypatch):
     preparar_base(tmp_path, monkeypatch)
     assert cancelar_venta(99) is False
+
+
+def test_cancelar_compra_resta_las_piezas(tmp_path, monkeypatch):
+    preparar_base(tmp_path, monkeypatch)
+    registrar_compra(1, 10, 100)
+    compra_id = ultimas_compras(1)[0][0]
+    assert cancelar_compra(compra_id) is True
+    assert leer_existencias() == 0
+
+
+def test_no_se_cancela_compra_si_ya_se_vendio(tmp_path, monkeypatch):
+    preparar_base(tmp_path, monkeypatch)
+    registrar_compra(1, 10, 100)
+    registrar_venta(1, 4)
+    compra_id = ultimas_compras(1)[0][0]
+    assert cancelar_compra(compra_id) is False
+    assert leer_existencias() == 6
+
+
+def test_cancelar_gasto(tmp_path, monkeypatch):
+    preparar_base(tmp_path, monkeypatch)
+    registrar_gasto("bolsas", 20)
+    gasto_id = ultimos_gastos(1)[0][0]
+    assert cancelar_gasto(gasto_id) is True
+    assert ultimos_gastos(1) == []
