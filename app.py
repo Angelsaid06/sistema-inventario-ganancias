@@ -2,6 +2,7 @@ import os
 import sqlite3
 import streamlit as st
 import pandas as pd
+from datetime import date
 from inventario import registrar_compra, registrar_venta, registrar_gasto, listar_productos, resumen_ganancias
 from prediccion import ventas_por_dia, promedio_movil, dias_restantes, sugerir_reabasto, comparar_modelos
 from asistente import preguntar, crear_tabla_precios, registrar_precio, precios_proveedor, evaluar_recomendaciones, resumen_evaluacion
@@ -330,14 +331,90 @@ def pagina_evaluacion():
     st.write("Veces que lo sugerido alcanzo para la demanda: " + str(resumen["porcentaje_alcanzo"]) + "%")
     st.table(evaluadas)
     st.caption("Error = |existencias + piezas sugeridas - piezas vendidas en los 7 dias siguientes|. Menor es mejor. Si un producto se agota, la demanda real se subestima.")
+def pagina_inicio():
+    st.header("Inicio")
+    productos = listar_productos()
+    if len(productos) == 0:
+        st.info("Aun no hay productos. Agrega el primero en la seccion Productos.")
+        return
+
+    resumen = resumen_ganancias()
+
+    conexion = sqlite3.connect("inventario.db")
+    cursor = conexion.cursor()
+    cursor.execute(
+        "SELECT SUM(cantidad), SUM(cantidad * precio_unitario) FROM ventas WHERE fecha = ?",
+        (str(date.today()),)
+    )
+    hoy = cursor.fetchone()
+    cursor.execute(
+        "SELECT fecha, SUM(cantidad * precio_unitario) FROM ventas "
+        "GROUP BY fecha ORDER BY fecha DESC LIMIT 14"
+    )
+    por_dia = cursor.fetchall()
+    conexion.close()
+
+    piezas_hoy = hoy[0]
+    ingresos_hoy = hoy[1]
+    if piezas_hoy is None:
+        piezas_hoy = 0
+        ingresos_hoy = 0
+
+    por_agotarse = 0
+    for fila in productos:
+        if fila[3] <= 5:
+            por_agotarse = por_agotarse + 1
+
+    columna1, columna2 = st.columns(2)
+    columna1.metric("Ventas de hoy", "$" + str(round(ingresos_hoy, 2)))
+    columna2.metric("Piezas vendidas hoy", piezas_hoy)
+
+    columna3, columna4 = st.columns(2)
+    columna3.metric("Ganancia neta total", "$" + str(round(resumen["ganancia_neta"], 2)))
+    columna4.metric("Productos por agotarse", por_agotarse)
+
+    if len(por_dia) > 0:
+        por_dia.reverse()
+        datos = pd.DataFrame(por_dia, columns=["Fecha", "Ingresos"])
+        datos = datos.set_index("Fecha")
+        st.subheader("Ingresos de los ultimos dias")
+        st.bar_chart(datos)
+
+
+def pagina_venta_rapida():
+    st.header("Venta rapida")
+    st.caption("Toca un producto para registrar 1 pieza vendida.")
+
+    mensaje = st.session_state.pop("ultima_venta", None)
+    if mensaje is not None:
+        st.success(mensaje)
+
+    productos = listar_productos()
+    if len(productos) == 0:
+        st.write("Primero agrega productos en la seccion Productos")
+        return
+
+    for fila in productos:
+        texto = fila[1] + "  ($" + str(fila[2]) + ")  -  quedan " + str(fila[3])
+        if st.button(texto, key="rapida_" + str(fila[0]), disabled=(fila[3] == 0)):
+            registrar_venta(fila[0], 1)
+            st.session_state.ultima_venta = "Vendido: " + fila[1]
+            st.rerun()
+st.set_page_config(page_title="Inventario y ganancias", page_icon="🛒")
 st.title("Inventario y ganancias")
 
 pagina = st.sidebar.radio(
     "Menu",
-    ["Productos", "Registrar venta", "Registrar compra", "Gastos", "Reporte de ganancias", "Ventas por dia", "Reporte por mes", "Prediccion", "Precios de proveedores", "Asistente", "Evaluacion"]
+    ["Inicio", "Venta rapida", "Productos", "Registrar venta", "Registrar compra", "Gastos",
+     "Reporte de ganancias", "Ventas por dia", "Reporte por mes", "Prediccion",
+     "Precios de proveedores", "Asistente", "Evaluacion"]
 )
 
-if pagina == "Productos":
+if pagina == "Inicio":
+    pagina_inicio()
+elif pagina == "Venta rapida":
+    pagina_venta_rapida()
+elif pagina == "Productos":
     pagina_productos()
 elif pagina == "Registrar venta":
     pagina_venta()
