@@ -7,15 +7,36 @@ from inventario import registrar_compra, registrar_venta, registrar_gasto, lista
 from prediccion import ventas_por_dia, promedio_movil, dias_restantes, sugerir_reabasto, comparar_modelos
 from asistente import preguntar, crear_tabla_precios, registrar_precio, precios_proveedor, evaluar_recomendaciones, resumen_evaluacion
 from database import crear_tablas
+from cargar_datos import cargar_ejemplo
 
+st.set_page_config(page_title="Inventario y ganancias", page_icon="🛒")
+
+# Si no existe la base de datos, se crea vacia
 if not os.path.exists("inventario.db"):
     crear_tablas()
-    import cargar_datos
 
 
 def pagina_productos():
     st.header("Productos")
+
+    with st.expander("Agregar producto"):
+        nombre = st.text_input("Nombre")
+        precio = st.number_input("Precio de venta", min_value=0.0, step=0.5)
+        if st.button("Guardar producto"):
+            if nombre.strip() == "" or precio <= 0:
+                st.error("Escribe un nombre y un precio mayor a 0")
+            else:
+                agregar_producto(nombre, precio)
+                st.success("Producto agregado")
+
     productos = listar_productos()
+
+    if len(productos) == 0:
+        st.info("Bienvenido. Aun no tienes productos: agrega el primero arriba, o carga unos de ejemplo para explorar la app.")
+        if st.button("Cargar datos de ejemplo"):
+            cargar_ejemplo()
+            st.rerun()
+        return
 
     # Alertas: productos con 5 piezas o menos
     for fila in productos:
@@ -33,6 +54,10 @@ def pagina_productos():
 def pagina_venta():
     st.header("Registrar venta")
     productos = listar_productos()
+    if len(productos) == 0:
+        st.write("Primero agrega productos en la seccion Productos")
+        return
+
     nombres = []
     for fila in productos:
         nombres.append(fila[1])
@@ -56,6 +81,10 @@ def pagina_venta():
 def pagina_compra():
     st.header("Registrar compra")
     productos = listar_productos()
+    if len(productos) == 0:
+        st.write("Primero agrega productos en la seccion Productos")
+        return
+
     nombres = []
     for fila in productos:
         nombres.append(fila[1])
@@ -95,6 +124,8 @@ def pagina_reporte():
     st.write("Ganancia de ventas:", round(resumen["ganancia_ventas"], 2))
     st.write("Gastos extra:", round(resumen["gastos"], 2))
     st.subheader("Ganancia neta: " + str(round(resumen["ganancia_neta"], 2)))
+
+
 def pagina_ventas_dia():
     st.header("Ventas por dia")
     conexion = sqlite3.connect("inventario.db")
@@ -126,6 +157,8 @@ def pagina_ventas_dia():
         datos = pd.DataFrame(mas_vendidos, columns=["Producto", "Vendidas"])
         datos = datos.set_index("Producto")
         st.bar_chart(datos)
+
+
 def pagina_gastos():
     st.header("Gastos extra")
     descripcion = st.text_input("Descripcion (ejemplo: bolsas, transporte)")
@@ -149,6 +182,8 @@ def pagina_gastos():
         for fila in filas:
             tabla.append({"Fecha": fila[0], "Descripcion": fila[1], "Monto": fila[2]})
         st.table(tabla)
+
+
 def pagina_mes():
     st.header("Reporte por mes")
     conexion = sqlite3.connect("inventario.db")
@@ -181,6 +216,8 @@ def pagina_mes():
         )
         csv = datos.to_csv(index=False)
         st.download_button("Descargar ventas en CSV", csv, "ventas.csv", "text/csv")
+
+
 def pagina_prediccion():
     st.header("Prediccion de reabastecimiento")
     fuente = st.radio("Datos", ["Mis datos", "Datos de demo (inventados)"])
@@ -223,9 +260,6 @@ def pagina_prediccion():
     st.table(tabla)
     st.caption("Estimacion basada en el promedio de los ultimos 7 dias; no es una garantia.")
 
-
-
-
     st.subheader("Que tan bien predice cada metodo")
     comparacion = []
     for producto in productos:
@@ -247,12 +281,14 @@ def pagina_prediccion():
     st.caption("Error = diferencia promedio entre las piezas reales y las predichas por dia, medida en los ultimos dias que el modelo no vio al entrenar. Menor es mejor.")
 
 
-
-
 def pagina_precios():
     st.header("Precios de proveedores")
     crear_tabla_precios("inventario.db")
     productos = listar_productos()
+    if len(productos) == 0:
+        st.write("Primero agrega productos en la seccion Productos")
+        return
+
     nombres = []
     for fila in productos:
         nombres.append(fila[1])
@@ -315,6 +351,8 @@ def pagina_asistente():
         except Exception as error:
             st.session_state.chat.append({"rol": "assistant", "texto": "Error: " + str(error)})
         st.rerun()
+
+
 def pagina_evaluacion():
     st.header("Evaluacion de las recomendaciones")
     evaluadas, pendientes = evaluar_recomendaciones("inventario.db", 7)
@@ -331,8 +369,19 @@ def pagina_evaluacion():
     st.write("Veces que lo sugerido alcanzo para la demanda: " + str(resumen["porcentaje_alcanzo"]) + "%")
     st.table(evaluadas)
     st.caption("Error = |existencias + piezas sugeridas - piezas vendidas en los 7 dias siguientes|. Menor es mejor. Si un producto se agota, la demanda real se subestima.")
+
+
 def pagina_inicio():
     st.header("Inicio")
+
+    # Accesos rapidos
+    columna_a, columna_b = st.columns(2)
+    columna_a.page_link(p_venta_rapida, label="Venta rapida", icon="⚡")
+    columna_b.page_link(p_productos, label="Productos", icon="📦")
+    columna_c, columna_d = st.columns(2)
+    columna_c.page_link(p_compra, label="Registrar compra", icon="🛒")
+    columna_d.page_link(p_reporte, label="Ganancias", icon="💰")
+
     productos = listar_productos()
     if len(productos) == 0:
         st.info("Aun no hay productos. Agrega el primero en la seccion Productos.")
@@ -413,36 +462,61 @@ def pagina_venta_rapida():
             st.session_state.ultima_venta = "Venta cancelada: " + venta[1]
             st.rerun()
 
-pagina = st.sidebar.radio(
-    "Menu",
-    ["Inicio", "Venta rapida", "Productos", "Registrar venta", "Registrar compra", "Gastos",
-     "Reporte de ganancias", "Ventas por dia", "Reporte por mes", "Prediccion",
-     "Precios de proveedores", "Asistente", "Evaluacion"]
-)
 
-if pagina == "Inicio":
-    pagina_inicio()
-elif pagina == "Venta rapida":
-    pagina_venta_rapida()
-elif pagina == "Productos":
-    pagina_productos()
-elif pagina == "Registrar venta":
-    pagina_venta()
-elif pagina == "Registrar compra":
-    pagina_compra()
-elif pagina == "Gastos":
-    pagina_gastos()
-elif pagina == "Reporte de ganancias":
-    pagina_reporte()
-elif pagina == "Ventas por dia":
-    pagina_ventas_dia()
-elif pagina == "Reporte por mes":
-    pagina_mes()
-elif pagina == "Prediccion":
-    pagina_prediccion()
-elif pagina == "Precios de proveedores":
-    pagina_precios()
-elif pagina == "Asistente":
-    pagina_asistente()
-else:
-    pagina_evaluacion()
+# ---------- Estilos y menu ----------
+
+ESTILOS = """
+<style>
+div.stButton > button {
+    border-radius: 14px;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    font-weight: 600;
+    color: white;
+    background: linear-gradient(135deg, #1D9E75, #14B8A6);
+}
+div.stButton > button:hover {
+    color: white;
+    filter: brightness(1.08);
+}
+div.stButton > button:disabled {
+    background: #D1D5DB;
+    color: #6B7280;
+}
+div[data-testid="stMetric"] {
+    background: #F0F7F4;
+    border-radius: 16px;
+    padding: 14px 16px;
+}
+a[data-testid="stPageLink-NavLink"] {
+    background: #F0F7F4;
+    border-radius: 14px;
+    padding: 0.7rem 1rem;
+    font-weight: 600;
+}
+</style>
+"""
+st.markdown(ESTILOS, unsafe_allow_html=True)
+
+p_inicio = st.Page(pagina_inicio, title="Inicio", icon="🏠", default=True)
+p_venta_rapida = st.Page(pagina_venta_rapida, title="Venta rapida", icon="⚡")
+p_venta = st.Page(pagina_venta, title="Registrar venta", icon="🧾")
+p_productos = st.Page(pagina_productos, title="Productos", icon="📦")
+p_compra = st.Page(pagina_compra, title="Registrar compra", icon="🛒")
+p_gastos = st.Page(pagina_gastos, title="Gastos", icon="💸")
+p_precios = st.Page(pagina_precios, title="Precios de proveedores", icon="🏷️")
+p_reporte = st.Page(pagina_reporte, title="Ganancias", icon="💰")
+p_dia = st.Page(pagina_ventas_dia, title="Ventas por dia", icon="📅")
+p_mes = st.Page(pagina_mes, title="Reporte por mes", icon="🗓️")
+p_prediccion = st.Page(pagina_prediccion, title="Prediccion", icon="🔮")
+p_asistente = st.Page(pagina_asistente, title="Asistente", icon="🤖")
+p_evaluacion = st.Page(pagina_evaluacion, title="Evaluacion", icon="📈")
+
+navegacion = st.navigation({
+    "Principal": [p_inicio, p_venta_rapida],
+    "Ventas": [p_venta],
+    "Inventario": [p_productos, p_compra, p_gastos, p_precios],
+    "Reportes": [p_reporte, p_dia, p_mes],
+    "Inteligencia": [p_prediccion, p_asistente, p_evaluacion],
+})
+navegacion.run()
